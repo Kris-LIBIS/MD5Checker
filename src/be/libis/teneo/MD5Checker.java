@@ -5,11 +5,15 @@
  */
 package be.libis.teneo;
 
+import java.awt.Color;
+import java.awt.Component;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintWriter;
+import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
@@ -20,9 +24,13 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.regex.Pattern;
 import javax.swing.JFileChooser;
+import javax.swing.JOptionPane;
+import javax.swing.JTable;
 import javax.swing.SwingWorker;
+import javax.swing.UIManager;
+import javax.swing.UnsupportedLookAndFeelException;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 
 /**
@@ -45,29 +53,129 @@ public class MD5Checker extends javax.swing.JFrame {
         public Status status;
     }
 
+    class ProcessingUpdate {
+
+        public File started;
+        public FileInfo done;
+
+        public ProcessingUpdate(File file) {
+            started = file;
+        }
+
+        public ProcessingUpdate(FileInfo info) {
+            done = info;
+        }
+    }
+
     /**
      * Creates new form MD5Checker
      */
     public MD5Checker() {
         this.filesInfo = new TreeMap();
         initComponents();
+        initialState();
+    }
+    
+    private void initialState() {
+        btnFolder.setEnabled(true);
+        tabPanel.setVisible(false);
+        btnSaveChecksum.setVisible(false);
+        btnSuccess.setVisible(false);
+        pnlStatus.setVisible(false);
+    }
+    
+    private void processingState() {
+        btnFolder.setEnabled(false);
+        filesInfo.clear();
+        pbarFolder.setValue(0);
+        tabPanel.setVisible(true);
+        btnSaveChecksum.setVisible(false);
+        btnSuccess.setVisible(false);
+        pnlStatus.setVisible(true);
+        txtProcessing.setText(" >>> Starting <<< ");
+        getTableModel().setRowCount(0);
+        getSummaryModel().setRowCount(0);
+        getSummaryModel().addRow(new Object[]{"Unmodified files", 0, "OK"});
+        getSummaryModel().addRow(new Object[]{"New files", 0, "NEW"});
+        getSummaryModel().addRow(new Object[]{"Changed files", 0, "CHANGED"});
+        getSummaryModel().addRow(new Object[]{"Deleted files", 0, "DELETED"});
+        getSummaryModel().addRow(new Object[]{"TOTAL", 0, ""});
+    }
+    
+    private void processingDoneState() {
+        btnFolder.setEnabled(true);
+        pnlStatus.setVisible(false);
+        if (checksumsChanged()) {
+            btnSaveChecksum.setVisible(true);
+        } else {
+            btnSuccess.setVisible(true);
+        }
     }
 
     private DefaultTableModel getTableModel() {
         return (DefaultTableModel) tblFileInfo.getModel();
     }
 
+    private DefaultTableModel getSummaryModel() {
+        return (DefaultTableModel) tblSummary.getModel();
+    }
+
     private void getFileInfos() {
-        this.filesInfo.clear();
-        this.pbarFolder.setValue(0);
-        getTableModel().setRowCount(0);
+        processingState();
 
         new Checksummer(this.folder).execute();
+    }
+
+    private void startFileProcessing(File started) {
+        txtProcessing.setText(started.getName());
     }
 
     private void addFileInfo(FileInfo fileInfo) {
         this.filesInfo.put(fileInfo.file.getName(), fileInfo);
         getTableModel().addRow(new Object[]{fileInfo.file.getName(), fileInfo.checksum, fileInfo.status.toString()});
+        pbarFolder.setValue(pbarFolder.getValue() + 1);
+        DefaultTableModel summaryData = getSummaryModel();
+        switch (fileInfo.status) {
+            case OK:
+                summaryData.setValueAt((int) summaryData.getValueAt(0, 1) + 1, 0, 1);
+                break;
+            case NEW:
+                summaryData.setValueAt((int) summaryData.getValueAt(1, 1) + 1, 1, 1);
+                break;
+            case CHANGED:
+                summaryData.setValueAt((int) summaryData.getValueAt(2, 1) + 1, 2, 1);
+                break;
+            case DELETED:
+                summaryData.setValueAt((int) summaryData.getValueAt(3, 1) + 1, 3, 1);
+                break;
+        }
+        summaryData.setValueAt((int) summaryData.getValueAt(4, 1) + 1, 4, 1);
+    }
+
+    private void checksumFinished() {
+        processingDoneState();
+    }
+
+    private boolean checksumsChanged() {
+        return this.filesInfo.values().stream()
+                .anyMatch((fileInfo) -> (fileInfo.status != Status.OK));
+    }
+
+    private void writeChecksum() {
+        try {
+            File checksum = new File(this.folder, Checksummer.CHECKSUM_FILE);
+            try (PrintWriter writer = new PrintWriter(checksum, "UTF-8")) {
+                this.filesInfo.values().forEach((fileInfo) -> {
+                    if (fileInfo.checksum != null) {
+                        writer.printf("%s *%s\n", fileInfo.checksum, fileInfo.file.getName());
+                    }
+                });
+            }
+            JOptionPane.showMessageDialog(null, "Checksum file saved.");
+            initialState();
+        } catch (FileNotFoundException | UnsupportedEncodingException ex) {
+            Logger.getLogger(MD5Checker.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
 
     /**
@@ -82,15 +190,25 @@ public class MD5Checker extends javax.swing.JFrame {
         lblFolder = new javax.swing.JLabel();
         txtFolder = new javax.swing.JTextField();
         btnFolder = new javax.swing.JButton();
-        pbarFolder = new javax.swing.JProgressBar();
+        tabPanel = new javax.swing.JTabbedPane();
+        pnlOverview = new javax.swing.JPanel();
+        tblSummary = new javax.swing.JTable();
         pnlTable = new javax.swing.JScrollPane();
         tblFileInfo = new javax.swing.JTable();
+        pnlLayers = new javax.swing.JLayeredPane();
+        btnSaveChecksum = new javax.swing.JButton();
+        btnSuccess = new javax.swing.JButton();
+        pnlStatus = new javax.swing.JPanel();
+        lblProcessing = new javax.swing.JLabel();
+        txtProcessing = new javax.swing.JTextField();
+        pbarFolder = new javax.swing.JProgressBar();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
         setTitle("LIBIS Teneo MD5 Checker");
 
         lblFolder.setText("Folder:");
 
+        txtFolder.setEditable(false);
         txtFolder.setText("Folder name ...");
 
         btnFolder.setText("Select");
@@ -102,6 +220,55 @@ public class MD5Checker extends javax.swing.JFrame {
             }
         });
 
+        tblSummary.setModel(new javax.swing.table.DefaultTableModel(
+            new Object [][] {
+
+            },
+            new String [] {
+                "Summary", "File count", "Status"
+            }
+        ) {
+            Class[] types = new Class [] {
+                java.lang.String.class, java.lang.Integer.class, java.lang.String.class
+            };
+            boolean[] canEdit = new boolean [] {
+                false, false, false
+            };
+
+            public Class getColumnClass(int columnIndex) {
+                return types [columnIndex];
+            }
+
+            public boolean isCellEditable(int rowIndex, int columnIndex) {
+                return canEdit [columnIndex];
+            }
+        });
+        tblSummary.setAutoResizeMode(javax.swing.JTable.AUTO_RESIZE_NEXT_COLUMN);
+        tblSummary.getTableHeader().setReorderingAllowed(false);
+
+        javax.swing.GroupLayout pnlOverviewLayout = new javax.swing.GroupLayout(pnlOverview);
+        pnlOverview.setLayout(pnlOverviewLayout);
+        pnlOverviewLayout.setHorizontalGroup(
+            pnlOverviewLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addComponent(tblSummary, javax.swing.GroupLayout.DEFAULT_SIZE, 757, Short.MAX_VALUE)
+        );
+        pnlOverviewLayout.setVerticalGroup(
+            pnlOverviewLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addComponent(tblSummary, javax.swing.GroupLayout.DEFAULT_SIZE, 165, Short.MAX_VALUE)
+        );
+
+        if (tblSummary.getColumnModel().getColumnCount() > 0) {
+            tblSummary.getColumnModel().getColumn(0).setResizable(false);
+            tblSummary.getColumnModel().getColumn(0).setCellRenderer(new ColorRenderer());
+            tblSummary.getColumnModel().getColumn(1).setResizable(false);
+            tblSummary.getColumnModel().getColumn(1).setCellRenderer(new ColorRenderer());
+            tblSummary.getColumnModel().getColumn(2).setResizable(false);
+            tblSummary.getColumnModel().getColumn(2).setPreferredWidth(0);
+            tblSummary.getColumnModel().getColumn(2).setCellRenderer(new ColorRenderer());
+        }
+
+        tabPanel.addTab("Overview", pnlOverview);
+
         tblFileInfo.setModel(new javax.swing.table.DefaultTableModel(
             new Object [][] {
 
@@ -111,35 +278,112 @@ public class MD5Checker extends javax.swing.JFrame {
             }
         ) {
             boolean[] canEdit = new boolean [] {
-                false, true, false
+                false, false, false
             };
 
             public boolean isCellEditable(int rowIndex, int columnIndex) {
                 return canEdit [columnIndex];
             }
         });
+        tblFileInfo.setAutoResizeMode(javax.swing.JTable.AUTO_RESIZE_NEXT_COLUMN);
         pnlTable.setViewportView(tblFileInfo);
         if (tblFileInfo.getColumnModel().getColumnCount() > 0) {
             tblFileInfo.getColumnModel().getColumn(0).setPreferredWidth(400);
+            tblFileInfo.getColumnModel().getColumn(0).setCellRenderer(new ColorRenderer());
             tblFileInfo.getColumnModel().getColumn(1).setPreferredWidth(32);
+            tblFileInfo.getColumnModel().getColumn(1).setCellRenderer(new ColorRenderer());
             tblFileInfo.getColumnModel().getColumn(2).setPreferredWidth(16);
+            tblFileInfo.getColumnModel().getColumn(2).setCellRenderer(new ColorRenderer());
         }
+
+        tabPanel.addTab("Detail", pnlTable);
+
+        btnSaveChecksum.setBackground(new java.awt.Color(255, 102, 102));
+        btnSaveChecksum.setFont(new java.awt.Font("Dialog", 1, 18)); // NOI18N
+        btnSaveChecksum.setText("Click to update checksum file");
+        btnSaveChecksum.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnSaveChecksumActionPerformed(evt);
+            }
+        });
+
+        btnSuccess.setBackground(new java.awt.Color(153, 255, 153));
+        btnSuccess.setFont(new java.awt.Font("Dialog", 1, 18)); // NOI18N
+        btnSuccess.setText("Checksum is up to date");
+        btnSuccess.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnSuccessActionPerformed(evt);
+            }
+        });
+
+        lblProcessing.setText("Processing: ");
+
+        txtProcessing.setEditable(false);
+        txtProcessing.setHorizontalAlignment(javax.swing.JTextField.CENTER);
+        txtProcessing.setText(">>> STARTING <<<");
+        txtProcessing.setFocusable(false);
+
+        pbarFolder.setFont(new java.awt.Font("Dialog", 1, 10)); // NOI18N
+
+        javax.swing.GroupLayout pnlStatusLayout = new javax.swing.GroupLayout(pnlStatus);
+        pnlStatus.setLayout(pnlStatusLayout);
+        pnlStatusLayout.setHorizontalGroup(
+            pnlStatusLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(pnlStatusLayout.createSequentialGroup()
+                .addComponent(lblProcessing, javax.swing.GroupLayout.PREFERRED_SIZE, 93, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(txtProcessing))
+            .addComponent(pbarFolder, javax.swing.GroupLayout.DEFAULT_SIZE, 875, Short.MAX_VALUE)
+        );
+        pnlStatusLayout.setVerticalGroup(
+            pnlStatusLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(pnlStatusLayout.createSequentialGroup()
+                .addContainerGap()
+                .addGroup(pnlStatusLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(lblProcessing)
+                    .addComponent(txtProcessing, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(pbarFolder, javax.swing.GroupLayout.DEFAULT_SIZE, 52, Short.MAX_VALUE))
+        );
+
+        pnlLayers.setLayer(btnSaveChecksum, javax.swing.JLayeredPane.DEFAULT_LAYER);
+        pnlLayers.setLayer(btnSuccess, javax.swing.JLayeredPane.DEFAULT_LAYER);
+        pnlLayers.setLayer(pnlStatus, javax.swing.JLayeredPane.DEFAULT_LAYER);
+
+        javax.swing.GroupLayout pnlLayersLayout = new javax.swing.GroupLayout(pnlLayers);
+        pnlLayers.setLayout(pnlLayersLayout);
+        pnlLayersLayout.setHorizontalGroup(
+            pnlLayersLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addComponent(btnSuccess, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+            .addGroup(pnlLayersLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                .addComponent(pnlStatus, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+            .addGroup(pnlLayersLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                .addComponent(btnSaveChecksum, javax.swing.GroupLayout.DEFAULT_SIZE, 875, Short.MAX_VALUE))
+        );
+        pnlLayersLayout.setVerticalGroup(
+            pnlLayersLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addComponent(btnSuccess, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, 87, Short.MAX_VALUE)
+            .addGroup(pnlLayersLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                .addComponent(pnlStatus, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+            .addGroup(pnlLayersLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                .addComponent(btnSaveChecksum, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, 87, Short.MAX_VALUE))
+        );
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
+            .addGroup(layout.createSequentialGroup()
                 .addContainerGap()
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
-                    .addGroup(layout.createSequentialGroup()
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(tabPanel, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, 759, Short.MAX_VALUE)
+                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
                         .addComponent(lblFolder, javax.swing.GroupLayout.PREFERRED_SIZE, 56, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(txtFolder)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                         .addComponent(btnFolder, javax.swing.GroupLayout.PREFERRED_SIZE, 123, javax.swing.GroupLayout.PREFERRED_SIZE))
-                    .addComponent(pbarFolder, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addComponent(pnlTable, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.DEFAULT_SIZE, 865, Short.MAX_VALUE))
+                    .addComponent(pnlLayers))
                 .addContainerGap())
         );
         layout.setVerticalGroup(
@@ -151,9 +395,9 @@ public class MD5Checker extends javax.swing.JFrame {
                     .addComponent(txtFolder, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                     .addComponent(btnFolder))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(pnlTable, javax.swing.GroupLayout.DEFAULT_SIZE, 473, Short.MAX_VALUE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addComponent(pbarFolder, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addComponent(tabPanel, javax.swing.GroupLayout.DEFAULT_SIZE, 190, Short.MAX_VALUE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(pnlLayers, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addContainerGap())
         );
 
@@ -162,7 +406,8 @@ public class MD5Checker extends javax.swing.JFrame {
 
     private void btnFolderActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnFolderActionPerformed
         JFileChooser chooser = new JFileChooser();
-        chooser.setCurrentDirectory(new java.io.File("."));
+        File pwd = this.folder == null ? new File(".") : this.folder;
+        chooser.setCurrentDirectory(pwd);
         chooser.setDialogTitle("Select folder for checking MD5 checksums");
         chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
         chooser.setAcceptAllFileFilterUsed(false);
@@ -175,6 +420,16 @@ public class MD5Checker extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_btnFolderActionPerformed
 
+    private void btnSaveChecksumActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSaveChecksumActionPerformed
+        writeChecksum();
+        btnSaveChecksum.setEnabled(false);
+        btnSaveChecksum.setVisible(false);
+    }//GEN-LAST:event_btnSaveChecksumActionPerformed
+
+    private void btnSuccessActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSuccessActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_btnSuccessActionPerformed
+
     /**
      * @param args the command line arguments
      */
@@ -185,13 +440,14 @@ public class MD5Checker extends javax.swing.JFrame {
          * For details see http://download.oracle.com/javase/tutorial/uiswing/lookandfeel/plaf.html 
          */
         try {
-            for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
-                if ("Nimbus".equals(info.getName())) {
-                    javax.swing.UIManager.setLookAndFeel(info.getClassName());
-                    break;
-                }
-            }
-        } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | javax.swing.UnsupportedLookAndFeelException ex) {
+            UIManager.setLookAndFeel(UIManager.getCrossPlatformLookAndFeelClassName());
+//            for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
+//                if ("Nimbus".equals(info.getName())) {
+//                    javax.swing.UIManager.setLookAndFeel(info.getClassName());
+//                    break;
+//                }
+//            }
+        } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException ex) {
             java.util.logging.Logger.getLogger(MD5Checker.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
         }
         //</editor-fold>
@@ -204,7 +460,35 @@ public class MD5Checker extends javax.swing.JFrame {
         });
     }
 
-    private class Checksummer extends SwingWorker<Void, FileInfo> {
+    public class ColorRenderer extends DefaultTableCellRenderer {
+
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+            super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+            setForeground(Color.BLACK);
+            String status = (String) table.getModel().getValueAt(row, 2);
+            if (status != null) {
+                switch (status) {
+                    case "OK":
+                        setForeground(Color.DARK_GRAY);
+                        break;
+                    case "NEW":
+                        setForeground(Color.GREEN.darker().darker());
+                        break;
+                    case "DELETED":
+                        setForeground(Color.RED.darker());
+                        break;
+                    case "CHANGED":
+                        setForeground(Color.ORANGE);
+                        break;
+                }
+            }
+
+            return this;
+        }
+    }
+
+    private class Checksummer extends SwingWorker<Void, ProcessingUpdate> {
 
         private final File folder;
         private final Map<String, String> checksumInfo;
@@ -229,20 +513,13 @@ public class MD5Checker extends javax.swing.JFrame {
             try {
                 Scanner scanner = new Scanner(checksumFile);
                 while (scanner.hasNextLine()) {
-                    processChecksumLine(scanner.nextLine());
+                    String[] data = scanner.nextLine().split(" +[*]?", 2);
+                    if (data.length == 2) {
+                        this.checksumInfo.put(data[1], data[0]);
+                    }
                 }
             } catch (FileNotFoundException ex) {
                 Logger.getLogger(MD5Checker.class.getName()).log(Level.INFO, "Checksum file not found", ex);
-            }
-        }
-
-        private void processChecksumLine(String line) {
-            Scanner scanner = new Scanner(line);
-            scanner.useDelimiter(Pattern.compile(" +[*]?"));
-            if (scanner.hasNext()) {
-                String checksum = scanner.next();
-                String filename = scanner.next();
-                this.checksumInfo.put(filename, checksum);
             }
         }
 
@@ -256,11 +533,10 @@ public class MD5Checker extends javax.swing.JFrame {
             this.checksumInfo.keySet().forEach((filename) -> {
                 fileList.add(filename);
             });
-            setProgress(0);
-            int total = fileList.size();
-            int i = 0;
-            for (String fileName : fileList) {
+            pbarFolder.setMaximum(fileList.size());
+            fileList.stream().map((fileName) -> {
                 File file = new File(this.folder, fileName);
+                publish(new ProcessingUpdate(file));
                 FileInfo fileInfo = new FileInfo();
                 fileInfo.file = file;
                 if (file.exists()) {
@@ -270,12 +546,12 @@ public class MD5Checker extends javax.swing.JFrame {
                         = this.checksumInfo.get(fileName) == null ? Status.NEW
                         : (fileInfo.checksum == null ? Status.DELETED
                                 : (this.checksumInfo.get(fileName).equals(fileInfo.checksum) ? Status.OK : Status.CHANGED));
-                i++;
-                setProgress(100 * i / total);
-                publish(fileInfo);
-            }
+                return fileInfo;
+            }).forEachOrdered((fileInfo) -> {
+                publish(new ProcessingUpdate(fileInfo));
+            });
         }
-        
+
         private String getFileChecksum(File file) {
             try {
                 MessageDigest md5 = MessageDigest.getInstance("MD5");
@@ -306,20 +582,39 @@ public class MD5Checker extends javax.swing.JFrame {
         }
 
         @Override
-        protected void process(List<FileInfo> items) {
-            for (FileInfo fileInfo : items) {
-                addFileInfo(fileInfo);
-                pbarFolder.setValue(getProgress());
-            };
+        protected void process(List<ProcessingUpdate> items) {
+            for (ProcessingUpdate update : items) {
+                if (update.done != null) {
+                    addFileInfo(update.done);
+                }
+                if (update.started != null) {
+                    startFileProcessing(update.started);
+                }
+            }
         }
+
+        @Override
+        protected void done() {
+            checksumFinished();
+        }
+
     }
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton btnFolder;
+    private javax.swing.JButton btnSaveChecksum;
+    private javax.swing.JButton btnSuccess;
     private javax.swing.JLabel lblFolder;
+    private javax.swing.JLabel lblProcessing;
     private javax.swing.JProgressBar pbarFolder;
+    private javax.swing.JLayeredPane pnlLayers;
+    private javax.swing.JPanel pnlOverview;
+    private javax.swing.JPanel pnlStatus;
     private javax.swing.JScrollPane pnlTable;
+    private javax.swing.JTabbedPane tabPanel;
     private javax.swing.JTable tblFileInfo;
+    private javax.swing.JTable tblSummary;
     private javax.swing.JTextField txtFolder;
+    private javax.swing.JTextField txtProcessing;
     // End of variables declaration//GEN-END:variables
 }

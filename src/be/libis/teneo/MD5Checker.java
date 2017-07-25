@@ -422,7 +422,6 @@ public class MD5Checker extends javax.swing.JFrame {
 
     private void btnSaveChecksumActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSaveChecksumActionPerformed
         writeChecksum();
-        btnSaveChecksum.setEnabled(false);
         btnSaveChecksum.setVisible(false);
     }//GEN-LAST:event_btnSaveChecksumActionPerformed
 

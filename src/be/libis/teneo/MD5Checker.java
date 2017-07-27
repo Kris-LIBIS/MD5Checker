@@ -51,6 +51,7 @@ public class MD5Checker extends javax.swing.JFrame {
         public File file;
         public String checksum;
         public Status status;
+        public boolean ignored;
     }
 
     class ProcessingUpdate {
@@ -75,7 +76,7 @@ public class MD5Checker extends javax.swing.JFrame {
         initComponents();
         initialState();
     }
-    
+
     private void initialState() {
         btnFolder.setEnabled(true);
         tabPanel.setVisible(false);
@@ -83,7 +84,7 @@ public class MD5Checker extends javax.swing.JFrame {
         btnSuccess.setVisible(false);
         pnlStatus.setVisible(false);
     }
-    
+
     private void processingState() {
         btnFolder.setEnabled(false);
         filesInfo.clear();
@@ -99,9 +100,10 @@ public class MD5Checker extends javax.swing.JFrame {
         getSummaryModel().addRow(new Object[]{"New files", 0, "NEW"});
         getSummaryModel().addRow(new Object[]{"Changed files", 0, "CHANGED"});
         getSummaryModel().addRow(new Object[]{"Deleted files", 0, "DELETED"});
+        getSummaryModel().addRow(new Object[]{"Ignored files", 0, "IGNORED"});
         getSummaryModel().addRow(new Object[]{"TOTAL", 0, ""});
     }
-    
+
     private void processingDoneState() {
         btnFolder.setEnabled(true);
         pnlStatus.setVisible(false);
@@ -149,7 +151,10 @@ public class MD5Checker extends javax.swing.JFrame {
                 summaryData.setValueAt((int) summaryData.getValueAt(3, 1) + 1, 3, 1);
                 break;
         }
-        summaryData.setValueAt((int) summaryData.getValueAt(4, 1) + 1, 4, 1);
+        if (fileInfo.ignored) {
+            summaryData.setValueAt((int) summaryData.getValueAt(4, 1) + 1, 4, 1);
+        }
+        summaryData.setValueAt((int) summaryData.getValueAt(5, 1) + 1, 5, 1);
     }
 
     private void checksumFinished() {
@@ -205,6 +210,7 @@ public class MD5Checker extends javax.swing.JFrame {
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
         setTitle("LIBIS Teneo MD5 Checker");
+        setCursor(new java.awt.Cursor(java.awt.Cursor.DEFAULT_CURSOR));
 
         lblFolder.setText("Folder:");
 
@@ -250,11 +256,11 @@ public class MD5Checker extends javax.swing.JFrame {
         pnlOverview.setLayout(pnlOverviewLayout);
         pnlOverviewLayout.setHorizontalGroup(
             pnlOverviewLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(tblSummary, javax.swing.GroupLayout.DEFAULT_SIZE, 757, Short.MAX_VALUE)
+            .addComponent(tblSummary, javax.swing.GroupLayout.DEFAULT_SIZE, 494, Short.MAX_VALUE)
         );
         pnlOverviewLayout.setVerticalGroup(
             pnlOverviewLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(tblSummary, javax.swing.GroupLayout.DEFAULT_SIZE, 165, Short.MAX_VALUE)
+            .addComponent(tblSummary, javax.swing.GroupLayout.DEFAULT_SIZE, 126, Short.MAX_VALUE)
         );
 
         if (tblSummary.getColumnModel().getColumnCount() > 0) {
@@ -286,6 +292,11 @@ public class MD5Checker extends javax.swing.JFrame {
             }
         });
         tblFileInfo.setAutoResizeMode(javax.swing.JTable.AUTO_RESIZE_NEXT_COLUMN);
+        tblFileInfo.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                tblFileInfoMouseClicked(evt);
+            }
+        });
         pnlTable.setViewportView(tblFileInfo);
         if (tblFileInfo.getColumnModel().getColumnCount() > 0) {
             tblFileInfo.getColumnModel().getColumn(0).setPreferredWidth(400);
@@ -376,7 +387,7 @@ public class MD5Checker extends javax.swing.JFrame {
             .addGroup(layout.createSequentialGroup()
                 .addContainerGap()
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(tabPanel, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, 759, Short.MAX_VALUE)
+                    .addComponent(tabPanel, javax.swing.GroupLayout.Alignment.TRAILING)
                     .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
                         .addComponent(lblFolder, javax.swing.GroupLayout.PREFERRED_SIZE, 56, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
@@ -395,7 +406,7 @@ public class MD5Checker extends javax.swing.JFrame {
                     .addComponent(txtFolder, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                     .addComponent(btnFolder))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(tabPanel, javax.swing.GroupLayout.DEFAULT_SIZE, 190, Short.MAX_VALUE)
+                .addComponent(tabPanel, javax.swing.GroupLayout.DEFAULT_SIZE, 151, Short.MAX_VALUE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(pnlLayers, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addContainerGap())
@@ -428,6 +439,10 @@ public class MD5Checker extends javax.swing.JFrame {
     private void btnSuccessActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSuccessActionPerformed
         // TODO add your handling code here:
     }//GEN-LAST:event_btnSuccessActionPerformed
+
+    private void tblFileInfoMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_tblFileInfoMouseClicked
+        // TODO add your handling code here:
+    }//GEN-LAST:event_tblFileInfoMouseClicked
 
     /**
      * @param args the command line arguments
@@ -469,7 +484,7 @@ public class MD5Checker extends javax.swing.JFrame {
             if (status != null) {
                 switch (status) {
                     case "OK":
-                        setForeground(Color.DARK_GRAY);
+                        setForeground(Color.BLACK);
                         break;
                     case "NEW":
                         setForeground(Color.GREEN.darker().darker());
@@ -478,7 +493,10 @@ public class MD5Checker extends javax.swing.JFrame {
                         setForeground(Color.RED.darker());
                         break;
                     case "CHANGED":
-                        setForeground(Color.ORANGE);
+                        setForeground(Color.ORANGE.darker());
+                        break;
+                    case "IGNORED":
+                        setForeground(Color.GRAY);
                         break;
                 }
             }
@@ -490,8 +508,24 @@ public class MD5Checker extends javax.swing.JFrame {
     private class Checksummer extends SwingWorker<Void, ProcessingUpdate> {
 
         private final File folder;
-        private final Map<String, String> checksumInfo;
+        private final Map<String, ChecksumInfo> checksumInfo;
         private static final String CHECKSUM_FILE = "md5sums";
+
+        class ChecksumInfo {
+
+            public String checksum;
+            public boolean ignored;
+
+            public ChecksumInfo(String _checksum) {
+                this.checksum = _checksum;
+                this.ignored = false;
+                if (this.checksum.startsWith("#")) {
+                    this.checksum = this.checksum.substring(1);
+                    this.ignored = true;
+                }
+            }
+
+        }
 
         public Checksummer(File folder) {
             super();
@@ -514,7 +548,7 @@ public class MD5Checker extends javax.swing.JFrame {
                 while (scanner.hasNextLine()) {
                     String[] data = scanner.nextLine().split(" +[*]?", 2);
                     if (data.length == 2) {
-                        this.checksumInfo.put(data[1], data[0]);
+                        this.checksumInfo.put(data[1], new ChecksumInfo(data[0]));
                     }
                 }
             } catch (FileNotFoundException ex) {
@@ -533,7 +567,7 @@ public class MD5Checker extends javax.swing.JFrame {
                 fileList.add(filename);
             });
             pbarFolder.setMaximum(fileList.size());
-            fileList.stream().map((fileName) -> {
+            fileList.stream().map((String fileName) -> {
                 File file = new File(this.folder, fileName);
                 publish(new ProcessingUpdate(file));
                 FileInfo fileInfo = new FileInfo();
@@ -541,10 +575,17 @@ public class MD5Checker extends javax.swing.JFrame {
                 if (file.exists()) {
                     fileInfo.checksum = getFileChecksum(file);
                 }
-                fileInfo.status
-                        = this.checksumInfo.get(fileName) == null ? Status.NEW
-                        : (fileInfo.checksum == null ? Status.DELETED
-                                : (this.checksumInfo.get(fileName).equals(fileInfo.checksum) ? Status.OK : Status.CHANGED));
+                ChecksumInfo info = this.checksumInfo.get(fileName);
+                if (info == null) {
+                    fileInfo.status = Status.NEW;
+                } else if (fileInfo.checksum == null) {
+                    fileInfo.status = Status.DELETED;
+                } else if (info.checksum.equals(fileInfo.checksum)) {
+                    fileInfo.status = Status.OK;
+                } else {
+                    fileInfo.status = Status.CHANGED;
+                }
+                fileInfo.ignored = info.ignored;
                 return fileInfo;
             }).forEachOrdered((fileInfo) -> {
                 publish(new ProcessingUpdate(fileInfo));

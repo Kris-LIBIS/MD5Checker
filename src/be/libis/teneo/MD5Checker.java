@@ -506,6 +506,13 @@ public class MD5Checker extends javax.swing.JFrame {
     }
 
     private class Checksummer extends SwingWorker<Void, ProcessingUpdate> {
+        
+        /*
+        TODO:
+            - add ignored support in detail list
+            - add action to toggle ignore in detail list
+            - flag, but ignore checksum mismatches for ignored files
+        */
 
         private final File folder;
         private final Map<String, ChecksumInfo> checksumInfo;

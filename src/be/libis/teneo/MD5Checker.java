@@ -559,7 +559,7 @@ public class MD5Checker extends javax.swing.JFrame {
                     }
                 }
             } catch (FileNotFoundException ex) {
-                Logger.getLogger(MD5Checker.class.getName()).log(Level.INFO, "Checksum file not found", ex);
+                Logger.getLogger(MD5Checker.class.getName()).log(Level.INFO, "Checksum file not found");
             }
         }
 
@@ -609,6 +609,8 @@ public class MD5Checker extends javax.swing.JFrame {
                 while ((numRead = is.read(buffer)) != -1) {
                     md5.update(buffer, 0, numRead);
                 }
+                
+                is.close();
                 return bytesToHex(md5.digest());
             } catch (NoSuchAlgorithmException | IOException ex) {
                 Logger.getLogger(MD5Checker.class.getName()).log(Level.SEVERE, null, ex);
